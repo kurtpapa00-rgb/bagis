@@ -1,0 +1,45 @@
+name: NEXUS ODDS - Günlük Veri Güncelleme
+
+on:
+  schedule:
+    # Her gün 07:00 Türkiye saatinde çalışır (04:00 UTC).
+    # Fikstürler genelde gece/sabah netleştiği için bu saat seçildi;
+    # istersen aşağıdaki cron değerini değiştirebilirsin.
+    - cron: '0 4 * * *'
+  workflow_dispatch: {}   # Actions sekmesinden manuel de tetikleyebilirsin
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repo'yu al
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Bağımlılıkları kur
+        run: pip install requests
+
+      - name: Günlük veriyi çek
+        env:
+          API_FOOTBALL_KEY: ${{ secrets.API_FOOTBALL_KEY }}
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+        run: python fetch_daily.py
+
+      - name: Değişikliği commit'le ve gönder
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/daily.json
+          if git diff --staged --quiet; then
+            echo "Değişiklik yok, commit atlanıyor."
+          else
+            git commit -m "Günlük veri güncelleme: $(date -u +%Y-%m-%d)"
+            git push
+          fi
